@@ -14,11 +14,6 @@ Methods:
   - polygon_outline_to_vertices: convert length and inner angles of polygon to vertex coordinates.
   - polygon_centroid: get centroid from polygon vertices list.
 
-- Typechecking:
-
-  - is_numeric: numeric type check.
-  - is_cv_image: check is numpy array is valid openCV image.
-
 - File Handling:
 
   - load_json: json file loading helper.
@@ -38,7 +33,6 @@ __license__ = 'GPL-3.0-or-later'
 # standard library imports
 import numpy as np
 import math
-import numbers
 import json
 from typing import Any
 import warnings
@@ -169,47 +163,6 @@ def polygon_centroid(vertices: list[T2DPoint, ...] | np.ndarray
     centroid_x = shoelace_factor * np.sum((vertices[:-1, 0] + vertices[1:, 0]) * vertices_shoelace)
     centroid_y = shoelace_factor * np.sum((vertices[:-1, 1] + vertices[1:, 1]) * vertices_shoelace)
     return centroid_x, centroid_y
-
-
-"""Typechecking"""
-
-
-def is_numeric(input_: Any
-               ) -> bool:
-    """
-    Checks if input value is a numeric type.
-    :param input_: value to be checked.
-    :return: bool indicating if input is numeric.
-    """
-    return isinstance(input_, numbers.Number)
-
-
-def is_cv_image(input_: Any
-                ) -> bool:
-    """
-    Checks if the input is a numpy array containing a valid openCV image.
-    Monochrome, BGR and BGRA images are considered valid.
-    Images that are rescaled (float type) during displaying are considered invalid.
-
-    :param input_: input to be checked.
-    :return: boolean result of the test.
-    """
-    # check type
-    if not isinstance(input_, np.ndarray):
-        return False
-    # check shape (monochrome, BRG and BGRA)
-    if not (len(input_.shape) == 2 or len(input_.shape) == 3 and input_.shape[2] in [3, 4]):
-        return False
-    # check number ranges w.r.t. data types
-    if input_.dtype in [np.uint8, np.int8, np.uint16, np.int16]:
-        # int types can't be out of range
-        return True
-    if input_.dtype in [np.float32, np.float64]:
-        # openCV will clip float ranges, but that's only implicit
-        return 0. >= np.min(input_) and np.max(input_) <= 1.
-    # default
-    return False
-
 
 """File Handling"""
 

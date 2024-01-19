@@ -16,12 +16,11 @@ TArgs = Optional[Any]
 TKwargs = Optional[Any]
 
 # composed data types
-TNum = TypeVar('TNum', int, float, np.float64)
+TNum = TypeVar('TNum', int, float, np.number)
 T2DPoint = tuple[TNum, TNum]
 T2Vector = tuple[TNum, TNum]
 T3DPoint = tuple[TNum, TNum, TNum]
 T3Vector = tuple[TNum, TNum, TNum]
-TState = tuple[TNum, ...]
 
 # types of class instances (bound with string to prevent cyclic import issues)
 TController = TypeVar('TController', bound='Controller')

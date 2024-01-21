@@ -64,17 +64,13 @@ def is_numpy_array(input_: Any,
     :param dtype: data type of array elements (only numeric types are allowed), default is None indicating no type check
     :return: bool indicating if input is a numpy array of given conditions.
     """
-    assert (isinstance(shape, NoneType) or isinstance(shape, tuple) and all([isinstance(dim, (NoneType, int))
-                                                                             for dim in shape])
-            or isinstance(shape, list)
-            and all([isinstance(shape_, tuple)
-                     and all([isinstance(dim, (NoneType, int)) for dim in shape_]) for shape_ in shape])), \
+    assert (isinstance(shape, NoneType) or is_numpy_array_shape(shape, allow_none=True)
+            or isinstance(shape, list) and all([is_numpy_array_shape(shape_, allow_none=True) for shape_ in shape])), \
         'shape must be None, a tuple of int or a list of tuples of int'
     assert isinstance(min_value, NoneType) or is_numeric(min_value), 'min_value must be numeric or None'
     assert isinstance(max_value, NoneType) or is_numeric(max_value), 'max_value must be numeric or None'
-    assert (isinstance(dtype, NoneType) or isinstance(dtype, type) and np.can_cast(dtype, np.complex256)
-            or isinstance(dtype, list) and all([isinstance(dtype_, type)
-                                                and np.can_cast(dtype, np.complex256) for dtype_ in dtype])), \
+    assert (isinstance(dtype, NoneType) or is_numpy_dtype(dtype)
+            or isinstance(dtype, list) and all([is_numpy_dtype(dtype_) for dtype_ in dtype])), \
         'dtype must be None, a numeric type or a list of numeric types'
 
     if not isinstance(input_, np.ndarray):
@@ -96,6 +92,32 @@ def is_numpy_array(input_: Any,
     if isinstance(dtype, list) and not any([input_.dtype == dtype_ for dtype_ in dtype]):
         return False
     return True
+
+
+def is_numpy_array_shape(input_: Any,
+                         allow_none: bool = False
+                         ) -> bool:
+    """
+    Checks if the input is a valid shape for a numpy array.
+
+    :param input_: input to be checked.
+    :param allow_none: allows None as members of shape tuple, indicating any size in that dimension.
+    :return: boolean indicating if the input is a valid shape.
+    """
+
+    return (isinstance(input_, tuple)
+            and all([isinstance(dimension, (NoneType, int) if allow_none else int) for dimension in input_]))
+
+
+def is_numpy_dtype(input_: Any
+                   ) -> bool:
+    """
+    Checks if the input is a valid dtype (or compatible) for a numpy array.
+
+    :param input_: input to be checked.
+    :return: boolean indicating if the input is a valid dtype.
+    """
+    return isinstance(input_, type) and np.can_cast(input_, np.complex256)
 
 
 def is_cv_image(input_: Any

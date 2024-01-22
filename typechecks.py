@@ -1,11 +1,14 @@
 """
-Classes:
+Methods:
 
-- ClassName: class description.
-
-Methods: 
-
-- method_name: method description.
+- is_numeric: checks for (non-complex) numbers (including numpy support).
+- is_integer: checks for integers (including numpy support).
+- is_sequence: checks for sequences.
+- is_sequence_type: checks for sequence types.
+- is_numpy_array: checks for numpy arrays with given properties.
+- is_numpy_array_shape: checks for numpy arrays shapes.
+- is_numpy_dtype: checks for numpy dtypes and compatibles.
+- is_cv_image: checks for numpy arrays containing valid openCV images.
 
 """
 
@@ -29,6 +32,7 @@ def is_numeric(input_: Any
                ) -> bool:
     """
     Checks if input value is a numeric (non-complex) type including numpy support.
+
     :param input_: value to be checked.
     :return: bool indicating if input is numeric.
     """
@@ -39,10 +43,35 @@ def is_integer(input_: Any
                ) -> bool:
     """
     Checks if input value is an integer including numpy support (signed and unsigned for numpy are true).
+
     :param input_: value to be checked.
     :return: bool indicating if input is an integer.
     """
     return isinstance(input_, (int, np.integer))
+
+
+def is_sequence(input_: Any
+                ) -> bool:
+    """
+    Checks if input value is a sequence.
+    list, tuple, range and numpy arrays are considered sequences (in contrast to collections.abs.Sequence)
+
+    :param input_: value to be checked.
+    :return: bool indicating if input is a sequence.
+    """
+    return isinstance(input_, (list, tuple, range, np.ndarray))
+
+
+def is_sequence_type(input_: Any
+                     ) -> bool:
+    """
+    Checks if input value is a sequence type.
+    list, tuple, range and numpy arrays are considered sequences (in contrast to collections.abs.Sequence)
+
+    :param input_: value to be checked.
+    :return: bool indicating if input is a sequence type.
+    """
+    return input_ in [list, tuple, range, np.ndarray]
 
 
 def is_numpy_array(input_: Any,

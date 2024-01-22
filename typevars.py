@@ -21,6 +21,7 @@ T2DPoint = tuple[TNum, TNum]
 T2Vector = tuple[TNum, TNum]
 T3DPoint = tuple[TNum, TNum, TNum]
 T3Vector = tuple[TNum, TNum, TNum]
+TSequence = TypeVar('TSequence', list, tuple, range, np.ndarray)
 
 # types of class instances (bound with string to prevent cyclic import issues)
 TController = TypeVar('TController', bound='Controller')

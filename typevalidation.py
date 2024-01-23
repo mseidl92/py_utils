@@ -1,6 +1,7 @@
 """
 Methods:
 
+- bind: wrapper for partial of functools.
 - or_: chaining validation functions by or.
 - and_: chaining validation functions by and. USE WITH CAUTION: useful debugging statements not guaranteed.
 - not_: negating validation functions. USE WITH CAUTION: useful debugging statements not guaranteed.
@@ -12,6 +13,9 @@ Methods:
 - not_equal: validate numeric input to be not equal to a comparison value.
 - greater: validate numeric input to be greater than a lower limit.
 - greater_equal: validate numeric input to be greater than or equal to a lower limit.
+- sequence: validate input to be a sequence of certain properties.
+- tuple_: validate input to be a tuple of certain properties.
+- list_: validate a list to be a list with certain properties.
 - numpy_array: validate a numpy array or compatible with restricted shape, limits and data type.
 
 """
@@ -26,20 +30,21 @@ import numpy as np
 from typing import Any, TypeVar, Callable, Protocol
 from types import NoneType
 import inspect
-import re
-import traceback
+from functools import partial
 
 # project imports
-from .typevars import TNum, TSequence
-import typechecks as check
+from typevariables import TNum, TSequence, TArgs, TKwargs
+import typechecking as check
 
 
-# TODO, that works in mypy but not with the pycharm typechecker, wait for update to use it instead of Callable[..., T]
+# TODO that works in mypy but not with the pycharm typechecker, wait for update to use it instead of Callable[..., U]
+# TODO incorporate required default values?
 class _ValidationFunction(Protocol):
     """
     Protocol defining the callback type for a validation function.
     """
-    def __call__(self, input_: Any, /, *, variable_name: str | None = None) -> Any: ...
+
+    def __call__(self, input_: Any, /, *args, **kwargs) -> Any: ...
 
 
 def _is_validation_function(input_: Any
@@ -48,14 +53,12 @@ def _is_validation_function(input_: Any
     Helper function to check if an input is a valid validation function.
 
     Validation functions have one positional-only parameter without default value (the input to be validated)
-    and at least one keyword-only parameter 'variable_name' with default value None and type string.
-    It is used to print more meaningful debugging information.
     All other parameters must be bound or must have a default value, to which they will be evaluated during validation.
     """
     if not callable(input_):
         return False
     parameters = inspect.signature(input_).parameters
-    if not len(parameters) > 2:
+    if len(parameters) < 1:
         return False
     # input is first parameter
     for parameter in parameters.values():
@@ -64,89 +67,64 @@ def _is_validation_function(input_: Any
             return False
         break
     # input is only parameter without default value
-    if not len([parameter for parameter in parameters.values()
-                if parameter.default != parameter.empty]) == 1:
-        return False
-    # check if keyword parameter variable_name exists and has correct properties
-    try:
-        if parameters['variable_name'].kind != parameters['variable_name'].KEYWORD_ONLY:
-            return False
-        if parameters['variable_name'].default is not None:
-            return False
-        if parameters['variable_name'].annotation != str | None:
-            return False
-    except KeyError:
+    if len([parameter for parameter in parameters.values() if parameter.default == parameter.empty]) != 1:
         return False
     return True
 
 
-def _get_parameter_name(parameter_position: int = 1
-                        ) -> str:
+def bind(function: Callable,
+         /,
+         *args: TArgs,
+         **kwargs: TKwargs
+         ) -> Callable:
     """
-    Get the name of the variable assigned to a parameter of the function calling this as a string.
-    Uses stack inspection and should be used for debugging messages only!
-    :param parameter_position: The position of the parameter in the function signature (starting at 1).
-    :return: The name of the variable assigned to the parameter_positions parameter of the function calling this as
-             a string or the value if the parameter was given directly or the empty string if the calling function has
-             not that many parameters.
-    """
-    assert isinstance(parameter_position, int) and parameter_position > 0, \
-        'parameter_position must be a positive integer'
+    Wrapper around functools.partial.
+    Use to bind parameters to a functions, so it fits the signature of a validation function.
 
-    stack = traceback.extract_stack()
-    filename, lineno, function_name, code = stack[-3]
-    try:
-        return re.compile(r'\((.*?)\).*$').search(code).groups()[parameter_position - 1]
-    except IndexError:
-        return ''
+    Validation functions have one positional-only parameter without default value (the input to be validated)
+    and at least one keyword-only parameter 'variable_name' with default value None and type str | None.
+    It is used to print more meaningful debugging information.
+    All other parameters must be bound or must have a default value, to which they will be evaluated during validation.
+    """
+    return partial(function, *args, **kwargs)
 
 
 # TODO replace with local generic typing once updated to py 3.12 (e.g. def or_[T](...))
-T = TypeVar('T')
+U = TypeVar('U')
 
 
 def or_(input_: Any,
         /,
-        *validation_functions: Callable[..., T],
-        variable_name: str | None = None
-        ) -> T:
+        *validation_functions: Callable[..., U]  # _ValidationFunction,
+        ) -> U:
     """
     Validates an input against provided validation functions. Successful validation occurs if any function validates
     the input (or-functionality). Validation does short-circuit.
 
     :param input_: input to be validated.
-    :param validation_functions: any number of callable validation functions. Each function must be callable with two
-                                 parameters. The input to be validated as the only positional-only parameter without
-                                 default value and variable_name as keyword-only parameter of type str | None with
-                                 default value None. All other parameters must have a default value that will be used or
-                                 must be bound to a value (e.g. with a lambda-expression).
-    :param variable_name: string of the variable to be validated, used in error message. Default is None triggering
-                          name detection by stack inspection. Use internally when stack inspection will fail due to
-                          different depth of call in stack.
+    :param validation_functions: any number of callable validation functions.
+                                 (see _is_validation_function for specifications)
     :return: validated input.
     :raises Exception: if all validation functions fail to validate the input.
     """
     assert all([_is_validation_function(validation_function) for validation_function in validation_functions]), \
-        ('validation_functions must be callables with only one positional-only parameter that does not have a default '
-         'value and variable_name as keyword-only parameter of type str | None with default value None'
-         'Consider binding other parameters with a lambda-expression.')
-    assert isinstance(variable_name, (str, NoneType)), 'variable_name must be a string or None'
+        ('validation_functions must be callables with only one parameter without default value (positional-only). '
+         'Consider binding other parameters with functools.partial or the wrapper called \'bind\' from this module.')
 
     exceptions: list[Exception] = []
     for validation_function in validation_functions:
         try:
-            return validation_function(input_, _get_parameter_name(1) if variable_name is None else variable_name)
+            return validation_function(input_)
         except Exception as e:
             exceptions.append(e)
     # TODO use ExceptionGroup once updated to py 3.11
-    raise [Exception('or-validation failed. All exceptions raised.')] + exceptions
+    raise Exception('or-validation failed. All validations raised exceptions:', exceptions)
 
 
 def and_(input_: Any,
          /,
-         *validation_functions: Callable[..., T],
-         variable_name: str | None = None
-         ) -> T:
+         *validation_functions: Callable[..., U]  # _ValidationFunction,
+         ) -> U:
     """
     Validates an input against provided validation functions. Successful validation occurs if all functions validate
     the input (and-functionality). Validation does not short-circuit, to provide all exception raised.
@@ -156,41 +134,31 @@ def and_(input_: Any,
 
 
     :param input_: input to be validated.
-    :param validation_functions: any number of callable validation functions. Each function must be callable with two
-                                 parameters. The input to be validated as the only positional-only parameter without
-                                 default value and variable_name as keyword-only parameter of type str | None with
-                                 default value None. All other parameters must have a default value that will be used or
-                                 must be bound to a value (e.g. with a lambda-expression).
-    :param variable_name: string of the variable to be validated, used in error message. Default is None triggering
-                          name detection by stack inspection. Use internally when stack inspection will fail due to
-                          different depth of call in stack.
+    :param validation_functions: any number of callable validation functions.
+                                 (see _is_validation_function for specifications)
     :return: validated input.
     :raises Exception: if any validation function fails to validate the input.
     """
     assert all([_is_validation_function(validation_function) for validation_function in validation_functions]), \
-        ('validation_functions must be callables with only one positional-only parameter that does not have a default '
-         'value and variable_name as keyword-only parameter of type str | None with default value None'
-         'Consider binding other parameters with a lambda-expression.')
-    assert isinstance(variable_name, (str, NoneType)), 'variable_name must be a string or None'
+        ('validation_functions must be callables with only one parameter without default value (positional-only). '
+         'Consider binding other parameters with functools.partial or the wrapper called \'bind\' from this module.')
 
     exceptions: list[Exception] = []
     for validation_function in validation_functions:
         try:
-            validation_function(input_,  _get_parameter_name(1) if variable_name is None else variable_name)
+            validation_function(input_)
         except Exception as e:
             exceptions.append(e)
     if exceptions:
         # TODO use ExceptionGroup once updated to py 3.11
-        raise [Exception('and-validation failed. Exception(s) raised.')] + exceptions
+        raise Exception('and-validation failed. Exception(s) raised:', exceptions)
     return input_
 
 
 def not_(input_: Any,
          /,
-         validation_function: Callable[..., T],  # _ValidationFunction,
-         *,
-         variable_name: str | None = None
-         ) -> T:
+         validation_function: Callable[..., U]  # _ValidationFunction,
+         ) -> U:
     """
     Validates an input against provided validation functions. Successful validation occurs if the validation
     function fails to validate the input (not-functionality).
@@ -199,254 +167,182 @@ def not_(input_: Any,
     if at all possible. This function will not be able to give meaningful debugging messages.
 
     :param input_: input to be validated.
-    :param validation_function: a callable validation function. Must be callable with two parameters. The input to be
-                                validated as the only positional-only parameter without default value and variable_name
-                                as keyword-only parameter of type str | None with default value None. All other
-                                parameters must have a default value that will be used or must be bound to a value
-                                (e.g. with a lambda-expression).
-    :param variable_name: string of the variable to be validated, used in error message. Default is None triggering
-                          name detection by stack inspection. Use internally when stack inspection will fail due to
-                          different depth of call in stack.
+    :param validation_function: a callable validation function.
+                                 (see _is_validation_function for specifications)
+
     """
     assert _is_validation_function(validation_function), \
-        ('validation_function must be callable with only one positional-only parameter that does not have a default '
-         'value and variable_name as keyword-only parameter of type str | None with default value None'
-         'Consider binding other parameters with a lambda-expression.')
-    assert isinstance(variable_name, (str, NoneType)), 'variable_name must be a string or None'
+        ('validation_functions must be callables with only one parameter without default value (positional-only). '
+         'Consider binding other parameters with functools.partial or the wrapper called \'bind\' from this module.')
 
     try:
-        validation_function(input_, _get_parameter_name(1) if variable_name is None else variable_name)
+        validation_function(input_)
     except:
         return input_
-    raise Exception('not-validation failed. No exceptions raised by {}'.format(_get_parameter_name(2)))
+    raise Exception('not-validation failed. No exceptions raised.')
 
 
 def none_(input_: Any,
-          /,
-          *,
-          variable_name: str | None = None
+          /
           ) -> None:
     """
     Validates an input to be None.
 
     :param input_: input to be validated.
-    :param variable_name: string of the variable to be validated, used in error message. Default is None triggering
-                          name detection by stack inspection. Use internally when stack inspection will fail due to
-                          different depth of call in stack.
     :return: validated input being None.
     :raises TypeError: if the input is not None.
     """
-    assert isinstance(variable_name, (str, NoneType)), 'variable_name must be a string or None'
-
     if input_ is not None:
-        raise TypeError('{} is not None'.format(_get_parameter_name(1) if variable_name is None else variable_name))
+        raise TypeError('value is not None')
     return input_
 
 
 def number(input_: Any,
-           /,
-           *,
-           variable_name: str | None = None
+           /
            ) -> TNum:
     """
     Validates an input to be a (non-complex) number.
 
     :param input_: input to be validated.
-    :param variable_name: string of the variable to be validated, used in error message. Default is None triggering
-                          name detection by stack inspection. Use internally when stack inspection will fail due to
-                          different depth of call in stack.
     :return: validated input of numeric type.
     :raises TypeError: if the input is not numeric.
     """
-    assert isinstance(variable_name, (str, NoneType)), 'variable_name must be a string or None'
-
     if not check.is_numeric(input_):
-        raise TypeError('{} is not numeric'.format(_get_parameter_name(1) if variable_name is None else variable_name))
+        raise TypeError('value is not numeric')
     return input_
 
 
 def integer(input_: Any,
-            /,
-            *,
-            variable_name: str | None = None
+            /
             ) -> int:
     """
     Validates an input to be an integer.
 
     :param input_: input to be validated.
-    :param variable_name: string of the variable to be validated, used in error message. Default is None triggering
-                          name detection by stack inspection. Use internally when stack inspection will fail due to
-                          different depth of call in stack.
     :return: validated input of int type.
     :raises TypeError: if the input is not an integer.
     """
-    assert isinstance(variable_name, (str, NoneType)), 'variable_name must be a string or None'
-
     if not check.is_integer(input_):
-        raise TypeError('{} is not an integer'
-                        .format(_get_parameter_name(1) if variable_name is None else variable_name))
+        raise TypeError('value is not an integer')
     return input_
 
 
 def less(number_: TNum,
          /,
-         upper_limit: TNum,
-         *,
-         variable_name: str | None = None
+         upper_limit: TNum = 0
          ) -> TNum:
     """
     Validates a numeric input to be less than an upper limit.
 
     :param number_: numeric input to be validated.
-    :param upper_limit: upper limit below which the input is valid.
-    :param variable_name: string of the variable to be validated, used in error message. Default is None triggering
-                          name detection by stack inspection. Use internally when stack inspection will fail due to
-                          different depth of call in stack.
+    :param upper_limit: upper limit below which the input is valid, default is 0.
     :return: validated input, a number less than upper_limit.
     :raises ValueError: if the number is greater than or equal to upper_limit;
     """
     assert check.is_numeric(number_), 'number_ must be numeric'
     assert check.is_numeric(upper_limit), 'upper_limit must be numeric'
-    assert isinstance(variable_name, (str, NoneType)), 'variable_name must be a string or None'
 
     if not number_ < upper_limit:
-        raise ValueError('{} is not less than {}'
-                         .format(_get_parameter_name(1) if variable_name is None else variable_name, upper_limit))
+        raise ValueError('value is not less than {}'.format(upper_limit))
     return number_
 
 
 def less_equal(number_: TNum,
                /,
-               upper_limit: TNum,
-               *,
-               variable_name: str | None = None
+               upper_limit: TNum = 0
                ) -> TNum:
     """
     Validates a numeric input to be less than or equal to an upper limit.
 
     :param number_: numeric input to be validated.
-    :param upper_limit: upper limit below and at which the input is valid.
-    :param variable_name: string of the variable to be validated, used in error message. Default is None triggering
-                          name detection by stack inspection. Use internally when stack inspection will fail due to
-                          different depth of call in stack.
+    :param upper_limit: upper limit below and at which the input is valid, default is 0.
     :return: validated input, a number less than or equal to upper_limit.
     :raises ValueError: if the number is greater than upper_limit.
     """
     assert check.is_numeric(number_), 'number_ must be numeric'
     assert check.is_numeric(upper_limit), 'upper_limit must be numeric'
-    assert isinstance(variable_name, (str, NoneType)), 'variable_name must be a string or None'
 
     if not number_ <= upper_limit:
-        raise ValueError('{} is not less than or equal to {}'
-                         .format(_get_parameter_name(1) if variable_name is None else variable_name, upper_limit))
+        raise ValueError('value is not less than or equal to {}'.format(upper_limit))
     return number_
 
 
 def equal(number_: TNum,
           /,
-          comparison_value: TNum,
-          *,
-          variable_name: str | None = None
+          comparison_value: TNum = 0
           ) -> TNum:
     """
     Validates a numeric input to be equal to a comparison value.
 
     :param number_: numeric input to be validated.
-    :param comparison_value: value at which the input is valid.
-    :param variable_name: string of the variable to be validated, used in error message. Default is None triggering
-                          name detection by stack inspection. Use internally when stack inspection will fail due to
-                          different depth of call in stack.
+    :param comparison_value: value at which the input is valid, default is 0.
     :return: validated input, a value equal to comparison_value.
     :raises ValueError: if the value is not equal to comparison_value.
     """
     assert check.is_numeric(number_), 'number_ must be numeric'
     assert check.is_numeric(comparison_value), 'comparison_value must be numeric'
-    assert isinstance(variable_name, (str, NoneType)), 'variable_name must be a string or None'
-
     if number_ != comparison_value:
-        raise ValueError('{} is not equal to {}'
-                         .format(_get_parameter_name(1) if variable_name is None else variable_name, comparison_value))
+        raise ValueError('value is not equal to {}'.format(comparison_value))
     return number_
 
 
 def not_equal(number_: TNum,
               /,
-              comparison_value: TNum,
-              *,
-              variable_name: str | None = None
+              comparison_value: TNum = 0
               ) -> TNum:
     """
     Validates a numeric input to be not equal to a comparison value.
 
     :param number_: numeric input to be validated.
-    :param comparison_value: value at which the input is invalid.
-    :param variable_name: string of the variable to be validated, used in error message. Default is None triggering
-                          name detection by stack inspection. Use internally when stack inspection will fail due to
-                          different depth of call in stack.
+    :param comparison_value: value at which the input is invalid, default is 0.
     :return: validated input, a value not equal to comparison_value.
     :raises ValueError: if the value is equal to comparison_value.
     """
     assert check.is_numeric(number_), 'number_ must be numeric'
     assert check.is_numeric(comparison_value), 'comparison_value must be numeric'
-    assert isinstance(variable_name, (str, NoneType)), 'variable_name must be a string or None'
 
     if number_ == comparison_value:
-        raise ValueError('{} is equal to {}'
-                         .format(_get_parameter_name(1) if variable_name is None else variable_name, comparison_value))
+        raise ValueError('value is equal to {}'.format(comparison_value))
     return number_
 
 
 def greater(number_: TNum,
             /,
-            lower_limit: TNum,
-            *,
-            variable_name: str | None = None
+            lower_limit: TNum = 0
             ) -> TNum:
     """
     Validates a numeric input to be greater than a lower limit.
 
     :param number_: numeric input to be validated.
-    :param lower_limit: lower limit above which the input is valid.
-    :param variable_name: string of the variable to be validated, used in error message. Default is None triggering
-                          name detection by stack inspection. Use internally when stack inspection will fail due to
-                          different depth of call in stack.
+    :param lower_limit: lower limit above which the input is valid, default is 0.
     :return: validated input, a number greater than lower_limit.
     :raises ValueError: if the number is less than or equal to lower_limit;
     """
     assert check.is_numeric(number_), 'number_ must be numeric'
     assert check.is_numeric(lower_limit), 'lower_limit must be numeric'
-    assert isinstance(variable_name, (str, NoneType)), 'variable_name must be a string or None'
 
     if not number_ > lower_limit:
-        raise ValueError('{} is not greater than {}'
-                         .format(_get_parameter_name(1) if variable_name is None else variable_name, lower_limit))
+        raise ValueError('value is not greater than {}'.format(lower_limit))
     return number_
 
 
 def greater_equal(number_: TNum,
                   /,
-                  lower_limit: TNum,
-                  *,
-                  variable_name: str | None = None
+                  lower_limit: TNum = 0
                   ) -> TNum:
     """
     Validates a numeric input to be greater than or equal to a lower limit.
 
     :param number_: numeric input to be validated.
-    :param lower_limit: lower limit below and at which the input is valid.
-    :param variable_name: string of the variable to be validated, used in error message. Default is None triggering
-                          name detection by stack inspection. Use internally when stack inspection will fail due to
-                          different depth of call in stack.
+    :param lower_limit: lower limit below and at which the input is valid, default is 0.
     :return: validated input, a number greater than or equal to lower_limit.
     :raises ValueError: if the number is less than lower_limit.
     """
     assert check.is_numeric(number_), 'number_ must be numeric'
     assert check.is_numeric(lower_limit), 'lower_limit must be numeric'
-    assert isinstance(variable_name, (str, NoneType)), 'variable_name must be a string or None'
 
     if not number_ >= lower_limit:
-        raise ValueError('{} is not greater than or equal to {}'
-                         .format(_get_parameter_name(1) if variable_name is None else variable_name, lower_limit))
+        raise ValueError('value is not greater than or equal to {}'.format(lower_limit))
     return number_
 
 
@@ -455,9 +351,7 @@ def sequence(input_: Any,
              sequence_type: None | type | list[type] = None,
              length: None | int | list[int] = None,
              type_: None | type | tuple[type] = None,
-             member_validation_function: Callable[..., Any] | tuple[Callable[..., Any]] | None = None,
-             *,
-             variable_name: str | None = None
+             member_validation_function: Callable[..., Any] | tuple[Callable[..., Any]] | None = None
              ) -> TSequence:
     """
     Validates an input to be a sequence with certain characteristics.
@@ -469,18 +363,10 @@ def sequence(input_: Any,
                    default is None indicating no restriction.
     :param type_: type of all member of the sequence or a tuple of types (must be the length of the sequence) indicating
                   the type of each element, default is None indicating no restriction.
-    :param member_validation_function: a callable validation function to be applied to all members or a sequence of
-                                       validation functions with same length as the tuple to be applied to the member
-                                       at the same position. Default is None indication no member validation by
-                                       separate validation functions.
-                                       A validation function must be callable with two parameters. The input to be
-                                       validated as the only positional-only parameter without default value and
-                                       variable_name as keyword-only parameter of type str | None with default value
-                                       None. All other parameters must have a default value that will be used or must be
-                                       bound to a value (e.g. with a lambda-expression).
-    :param variable_name: string of the variable to be validated, used in error message. Default is None triggering
-                          name detection by stack inspection. Use internally when stack inspection will fail due to
-                          different depth of call in stack.
+    :param member_validation_function: a callable validation function (see _is_validation_function for specifications)
+                                       to be applied to all members or a sequence of validation functions with same
+                                       length as the tuple to be applied to the member at the same position,
+                                       default is None indication no member validation by separate validation functions.
     :return: validated input, a sequence with given properties.
     :raises TypeError: if the input is not a sequence (of given type).
     :raises ValueError: if the sequence is not of given properties.
@@ -500,10 +386,8 @@ def sequence(input_: Any,
             or isinstance(member_validation_function, tuple)
             and all([_is_validation_function(member_validation_function_)
                      for member_validation_function_ in member_validation_function])), \
-        ('validation_function must be callable with only one positional-only parameter that does not have a default '
-         'value and variable_name as keyword-only parameter of type str | None with default value None'
-         'Consider binding other parameters with a lambda-expression.')
-    assert isinstance(variable_name, (str, NoneType)), 'variable_name must be a string or None'
+        ('validation_functions must be callables with only one parameter without default value (positional-only). '
+         'Consider binding other parameters with functools.partial or the wrapper called \'bind\' from this module.')
 
     # assert dependencies between parameters
     if isinstance(length, list):
@@ -520,31 +404,29 @@ def sequence(input_: Any,
 
     if sequence_type is None:
         if not check.is_sequence(input_):
-            raise TypeError('{} is not a sequence'
-                            .format(_get_parameter_name(1) if variable_name is None else variable_name))
+            raise TypeError('input is not a sequence')
     elif isinstance(sequence_type, type) and not isinstance(input_, sequence_type):
-        raise TypeError('{} is not a {}'
-                        .format(_get_parameter_name(1) if variable_name is None else variable_name, sequence_type))
+        raise TypeError('sequence is not a {}'.format(sequence_type))
     elif isinstance(sequence_type, list) and not any([isinstance(input_, sequence_type_)
                                                       for sequence_type_ in sequence_type]):
-        raise TypeError('{} is not any of {}'
-                        .format(_get_parameter_name(1) if variable_name is None else variable_name, sequence_type))
+        raise TypeError('sequence is not any of {}'.format(sequence_type))
     if isinstance(length, int) and length != len(input_):
         raise ValueError('{} is not of length {}'
-                         .format(_get_parameter_name(1) if variable_name is None else variable_name, length))
+                         .format(type(input_).__name__ if sequence_type else 'sequence', length))
+
     if isinstance(length, list) and not len(input_) in length:
         raise ValueError('{} is not of any of the length in {}'
-                         .format(_get_parameter_name(1) if variable_name is None else variable_name, length))
+                         .format(type(input_).__name__ if sequence_type else 'sequence', length))
     if isinstance(type_, type) and not all([isinstance(member, type_) for member in input_]):
-        raise ValueError('not all members of {} are of type {}'
-                         .format(_get_parameter_name(1) if variable_name is None else variable_name, type_))
+        raise ValueError('not all members of the {} are of type {}'
+                         .format(type(input_).__name__ if sequence_type else 'sequence', type_))
     if isinstance(type_, tuple):
         if len(type_) != len(input_):
-            raise ValueError('signature {} does not have matching length for {}'
-                             .format(type_, _get_parameter_name(1) if variable_name is None else variable_name))
+            raise ValueError('signature {} does not have matching length for the {}'
+                             .format(type_, type(input_).__name__ if sequence_type else 'sequence',))
         if not all([isinstance(member, t) for member, t in zip(input_, type_)]):
             raise ValueError('{} does not have the type signature {}'
-                             .format(_get_parameter_name(1) if variable_name is None else variable_name, type_))
+                             .format(type(input_).__name__ if sequence_type else 'sequence', type_))
     exceptions: list[Exception] = []
     if _is_validation_function(member_validation_function):
         for idx, member in enumerate(input_):
@@ -557,8 +439,8 @@ def sequence(input_: Any,
             member_validation_function_(member, 'member at index {}'.format(idx))
     if exceptions:
         # TODO use ExceptionGroup once updated to py 3.11
-        raise [Exception('member-validation of {} failed. Exception(s) raised.'
-                         .format(_get_parameter_name(1) if variable_name is None else variable_name))] + exceptions
+        raise Exception('member-validation of {} failed. Exception(s) raised.'
+                        .format(type(input_).__name__ if sequence_type else 'sequence'), exceptions)
     return input_
 
 
@@ -566,9 +448,7 @@ def tuple_(input_: Any,
            /,
            length: None | int | list[int] = None,
            type_: None | type | tuple[type] = None,
-           member_validation_function: Callable[..., Any] | tuple[Callable[..., Any]] | None = None,
-           *,
-           variable_name: str | None = None
+           member_validation_function: Callable[..., Any] | tuple[Callable[..., Any]] | None = None
            ) -> tuple:
     """
     Validates an input to be a tuple with certain properties.
@@ -578,31 +458,20 @@ def tuple_(input_: Any,
     :param length: length of the tuple as int or list of acceptable length, default is None indicating no restriction.
     :param type_: type of all member of the tuple or a tuple of types (must be the length of the tuple) indicating the
                   type of each element, default is None indicating no restriction.
-    :param member_validation_function: a callable validation function to be applied to all members or a tuple of
-                                       validation functions with same length as the tuple to be applied to the member
-                                       at the same position. Default is None indication no member validation by
-                                       separate validation functions.
-                                       A validation function must be callable with two parameters. The input to be
-                                       validated as the only positional-only parameter without default value and
-                                       variable_name as keyword-only parameter of type str | None with default value
-                                       None. All other parameters must have a default value that will be used or must be
-                                       bound to a value (e.g. with a lambda-expression).
-    :param variable_name: string of the variable to be validated, used in error message. Default is None triggering
-                          name detection by stack inspection. Use internally when stack inspection will fail due to
-                          different depth of call in stack.
+    :param member_validation_function: a callable validation function (see _is_validation_function for specifications)
+                                       to be applied to all members or a sequence of validation functions with same
+                                       length as the tuple to be applied to the member at the same position,
+                                       default is None indication no member validation by separate validation functions.
     :return: validated input, a tuple with given properties.
     """
-    variable_name = _get_parameter_name(1) if variable_name is None else variable_name
-    return sequence(input_, tuple, length, type_, member_validation_function, variable_name=variable_name)
+    return sequence(input_, tuple, length, type_, member_validation_function)
 
 
 def list_(input_: Any,
           /,
           length: None | int | list[int] = None,
           type_: None | type | tuple[type] = None,
-          member_validation_function: Callable[..., Any] | tuple[Callable[..., Any]] | None = None,
-          *,
-          variable_name: str | None = None
+          member_validation_function: Callable[..., Any] | tuple[Callable[..., Any]] | None = None
           ) -> list:
     """
     Validates an input to be a list with certain properties.
@@ -612,22 +481,13 @@ def list_(input_: Any,
     :param length: length of the list as int or list of acceptable length, default is None indicating no restriction.
     :param type_: type of all member of the list or a tuple of types (must be the length of the list) indicating the
                   type of each element, default is None indicating no restriction.
-    :param member_validation_function: a callable validation function to be applied to all members or a list of
-                                       validation functions with same length as the list to be applied to the member
-                                       at the same position. Default is None indication no member validation by
-                                       separate validation functions.
-                                       A validation function must be callable with two parameters. The input to be
-                                       validated as the only positional-only parameter without default value and
-                                       variable_name as keyword-only parameter of type str | None with default value
-                                       None. All other parameters must have a default value that will be used or must be
-                                       bound to a value (e.g. with a lambda-expression).
-    :param variable_name: string of the variable to be validated, used in error message. Default is None triggering
-                          name detection by stack inspection. Use internally when stack inspection will fail due to
-                          different depth of call in stack.
+    :param member_validation_function: a callable validation function (see _is_validation_function for specifications)
+                                       to be applied to all members or a sequence of validation functions with same
+                                       length as the tuple to be applied to the member at the same position,
+                                       default is None indication no member validation by separate validation functions.
     :return: validated input, a list with given properties.
     """
-    variable_name = _get_parameter_name(1) if variable_name is None else variable_name
-    return sequence(input_, list, length, type_, member_validation_function, variable_name=variable_name)
+    return sequence(input_, list, length, type_, member_validation_function)
 
 
 def numpy_array(input_: Any,
@@ -636,8 +496,6 @@ def numpy_array(input_: Any,
                 min_value: None | TNum = None,
                 max_value: None | TNum = None,
                 dtype: None | type = None,
-                *,
-                variable_name: str | None = None
                 ) -> np.ndarray:
     """
     Validates an input to be a numpy array (or compatible) of a certain type.
@@ -649,9 +507,6 @@ def numpy_array(input_: Any,
     :param max_value: largest allowed value in the array, default is None to indicate no upper limit.
     :param dtype: data type of array elements, only numeric types are allowed (promoting output to dtype),
                   default is None keeping the default type assigned by numpy for the input (still numeric only!).
-    :param variable_name: string of the variable to be validated, used in error message. Default is None triggering
-                          name detection by stack inspection. Use internally when stack inspection will fail due to
-                          different depth of call in stack.
     :return: validated input, a numpy array of given shape and within given limits.
     :raises TypeError: if the input is not of proper shape, dtype is non-numeric or input cannot be cast to dtype.
     :raises ValueError: if the input array has (an) out of bounds value(s).
@@ -665,31 +520,22 @@ def numpy_array(input_: Any,
     assert (isinstance(dtype, NoneType) or check.is_numpy_dtype(dtype)
             or isinstance(dtype, list) and all([check.is_numpy_dtype(dtype_) for dtype_ in dtype])), \
         'dtype must be None, a numeric type or a list of numeric types'
-    assert isinstance(variable_name, (str, NoneType)), 'variable_name must be a string or None'
 
     array_ = np.array(input_)  # to capture compatible inputs
     if (isinstance(shape, tuple)
             and (len(shape) != len(input_.shape)
                  or not all([dim is None or dim == input_dim for dim, input_dim in zip(shape, input_.shape)]))):
-        raise TypeError('{} is not numpy array (compatible) of shape {}'.format(
-            _get_parameter_name(1) if variable_name is None else variable_name, shape).replace('None', 'Any'))
+        raise TypeError('numpy array (compatible) is not of shape {}'.format(shape).replace('None', 'Any'))
     if (isinstance(shape, list)
             and not any([len(shape_) == len(input_.shape)
                          and all([dim is None or dim == input_dim
                                   for dim, input_dim in zip(shape_, input_.shape)]) for shape_ in shape])):
-        raise TypeError('{} is not numpy array (compatible) of any of the shapes in {}'.format(
-            _get_parameter_name(1) if variable_name is None else variable_name, shape).replace('None', 'Any'))
+        raise TypeError('numpy array (compatible) is not of any of the shapes in {}'
+                        .format(shape).replace('None', 'Any'))
     if min_value is not None and np.min(array_) < min_value:
-        raise ValueError('{} contains at least one value below minimum {}'.
-                         format(_get_parameter_name(1) if variable_name is None else variable_name, min_value))
+        raise ValueError('numpy array (compatible) contains at least one value below minimum {}'.format(min_value))
     if max_value is not None and np.max(array_) > max_value:
-        raise ValueError('{} contains at least one value above maximum {}'
-                         .format(_get_parameter_name(1) if variable_name is None else variable_name, max_value))
+        raise ValueError('numpy array (compatible) contains at least one value above maximum {}'.format(max_value))
     if not np.can_cast(array_, dtype):
-        raise TypeError('{} is not numpy array (compatible) castable to {}'
-                        .format(_get_parameter_name(1) if variable_name is None else variable_name,
-                                np.dtype(dtype).name))
+        raise TypeError('numpy array (compatible) is not castable to {}'.format(np.dtype(dtype).name))
     return array_.astype(dtype)
-
-
-

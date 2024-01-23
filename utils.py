@@ -34,17 +34,16 @@ __license__ = 'GPL-3.0-or-later'
 import numpy as np
 import math
 import json
-from typing import Any
 import warnings
 
 # locally build library imports
 import cv2
 
 # project imports
-from .constants import FloatEquality, RGBColor, HorizontalTextAlignment, VerticalTextAlignment, WindowAnchor
-from .typevars import TNum, T2DPoint
-from .warnings_ import VisualizationWarning
-
+from constants import FloatEquality, RGBColor, HorizontalTextAlignment, VerticalTextAlignment, WindowAnchor
+from typevariables import TNum, T2DPoint
+from warnings_ import VisualizationWarning
+import typechecking as check
 
 """Mathematical"""
 
@@ -164,6 +163,7 @@ def polygon_centroid(vertices: list[T2DPoint, ...] | np.ndarray
     centroid_y = shoelace_factor * np.sum((vertices[:-1, 1] + vertices[1:, 1]) * vertices_shoelace)
     return centroid_x, centroid_y
 
+
 """File Handling"""
 
 
@@ -198,9 +198,9 @@ def value_to_image_dtype(value: int | float | np.ndarray,
     """
     # validate input
     assert (isinstance(value, int) and 0 <= value <= 255 or isinstance(value, float) and 0. <= value <= 1.
-            or isinstance(value, np.ndarray) and is_cv_image(value)), \
+            or isinstance(value, np.ndarray) and check.is_cv_image(value)), \
         'Expected value to be an int in [0, 255], a float in [0., 1.] or a valid openCV image as numpy array.'
-    assert is_cv_image(target) or isinstance(target, np.dtype), \
+    assert check.is_cv_image(target) or isinstance(target, np.dtype), \
         'Expected target to be a valid openCV image or numpy dtype object.'
 
     # unify input to dtype only
@@ -312,7 +312,7 @@ def print_text_on_image(text: tuple[str] | str,
     # validate inputs
     assert isinstance(text, str) or (isinstance(text, tuple) and all([isinstance(line, str) for line in text])), \
         'Expected type of text to be string or tuple of string.'
-    assert is_cv_image(image), 'Expected image to be a valid openCV image numpy array.'
+    assert check.is_cv_image(image), 'Expected image to be a valid openCV image numpy array.'
     assert (isinstance(text_area, tuple) and len(text_area) == 4 and all([isinstance(ta, int) for ta in text_area])
             and 0 <= text_area[0] <= image.shape[1] and 0 <= text_area[1] <= image.shape[0]
             and 0 < text_area[2] <= image.shape[1] and 0 < text_area[3] <= image.shape[0]), \
@@ -348,7 +348,7 @@ def print_text_on_image(text: tuple[str] | str,
     font_scale: float
     border_width: int
     line_distance: int
-    font_thickness: float
+    font_thickness: int
 
     n_lines: int
     line_width_max: int

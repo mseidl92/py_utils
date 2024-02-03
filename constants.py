@@ -19,6 +19,10 @@ from enum import EnumMeta, Enum
 
 
 class _ContainsEnumMeta(EnumMeta):
+    """
+    Inspired by
+    https://stackoverflow.com/questions/43634618/how-do-i-test-if-int-value-exists-in-python-enum-without-using-try-catch
+    """
     def __contains__(cls, item):
         try:
             cls(item)
@@ -26,6 +30,13 @@ class _ContainsEnumMeta(EnumMeta):
             return False
         else:
             return True
+
+
+class ContainsEnum(Enum, metaclass=_ContainsEnumMeta):
+    """
+    For typechecking purposes.
+    """
+    pass
 
 
 class FloatEquality:
@@ -60,7 +71,7 @@ class RGBColor:
     NAVY = (0, 0, 128)
 
 
-class HorizontalTextAlignment(Enum, metaclass=_ContainsEnumMeta):
+class HorizontalTextAlignment(ContainsEnum):
     """
     Standard horizontal text alignment modes.
     """
@@ -70,7 +81,7 @@ class HorizontalTextAlignment(Enum, metaclass=_ContainsEnumMeta):
     JUSTIFIED = 3
 
 
-class VerticalTextAlignment(Enum, metaclass=_ContainsEnumMeta):
+class VerticalTextAlignment(ContainsEnum):
     """
     Standard vertical text alignment modes.
     """
@@ -80,7 +91,7 @@ class VerticalTextAlignment(Enum, metaclass=_ContainsEnumMeta):
     SPREAD = 3
 
 
-class WindowAnchor(Enum, metaclass=_ContainsEnumMeta):
+class WindowAnchor(ContainsEnum):
     """
     Standard anchor points for a rectangular window.
 

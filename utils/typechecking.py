@@ -25,7 +25,7 @@ import numpy as np
 # local library imports
 
 # project imports
-from typevariables import TNum
+from .typevariables import TNum
 
 
 def is_numeric(input_: Any

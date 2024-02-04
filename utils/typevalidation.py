@@ -33,8 +33,8 @@ import inspect
 from functools import partial
 
 # project imports
-from typevariables import TNum, TSequence, TArgs, TKwargs
-import typechecking as check
+from .typevariables import TNum, TSequence, TArgs, TKwargs
+from . import typechecking as check
 
 
 # TODO that works in mypy but not with the pycharm typechecker, wait for update to use it instead of Callable[..., U]

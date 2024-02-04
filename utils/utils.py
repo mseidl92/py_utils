@@ -40,10 +40,10 @@ import warnings
 import cv2
 
 # project imports
-from constants import FloatEquality, RGBColor, HorizontalTextAlignment, VerticalTextAlignment, WindowAnchor
-from typevariables import TNum, T2DPoint
-from warnings_ import VisualizationWarning
-import typechecking as check
+from .constants import FloatEquality, RGBColor, HorizontalTextAlignment, VerticalTextAlignment, WindowAnchor
+from .typevariables import TNum, T2DPoint
+from .warnings_ import VisualizationWarning
+from . import typechecking as check
 
 """Mathematical"""
 

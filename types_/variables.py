@@ -7,15 +7,6 @@ __date__ = '2023-12-21'
 __version__ = '1.0'
 __license__ = 'GPL-3.0-or-later'
 
-__all__ = ['TArgs',
-           'TKwargs',
-           'TNum',
-           'T2DPoint',
-           'T2Vector',
-           'T3DPoint',
-           'T3Vector',
-           'TSequence']
-
 # standard library imports
 from typing import TypeVar, Any, Optional
 import numpy as np
@@ -24,7 +15,7 @@ import numpy as np
 TArgs = Optional[Any]
 TKwargs = Optional[Any]
 
-# composed data types
+# composed data types_
 TNum = TypeVar('TNum', int, float, np.number)
 T2DPoint = tuple[TNum, TNum]
 T2Vector = tuple[TNum, TNum]

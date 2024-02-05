@@ -1,5 +1,5 @@
 """
-Methods:
+Functions:
 
 - bind: wrapper for partial of functools.
 - or_: chaining validation functions by or.
@@ -25,23 +25,6 @@ __date__ = '2023-12-21'
 __version__ = '1.0'
 __license__ = 'GPL-3.0-or-later'
 
-__all__ = ['bind',
-           'or_',
-           'and_',
-           'not_',
-           'number',
-           'integer',
-           'less',
-           'less_equal',
-           'equal',
-           'not_equal',
-           'greater',
-           'greater_equal',
-           'sequence',
-           'tuple_',
-           'list_',
-           'numpy_array']
-
 # standard library imports
 import numpy as np
 from typing import Any, TypeVar, Callable, Protocol
@@ -50,9 +33,8 @@ import inspect
 from functools import partial
 
 # project imports
-from . import typechecking as check
-from .typevariables import TNum, TSequence, TArgs, TKwargs
-
+from . import check
+from .variables import TNum, TSequence, TArgs, TKwargs
 
 
 # TODO that works in mypy but not with the pycharm typechecker, wait for update to use it instead of Callable[..., U]
@@ -375,12 +357,12 @@ def sequence(input_: Any,
     Validates an input to be a sequence with certain characteristics.
 
     :param input_: input to be validated.
-    :param sequence_type: the type of sequence to be validated or a list of acceptable types, default is None indicating
-                          no restriction.
+    :param sequence_type: the type of sequence to be validated or a list of acceptable types_, default is None
+                          indicating no restriction.
     :param length: length of the sequence as int or list of acceptable length,
                    default is None indicating no restriction.
-    :param type_: type of all member of the sequence or a tuple of types (must be the length of the sequence) indicating
-                  the type of each element, default is None indicating no restriction.
+    :param type_: type of all member of the sequence or a tuple of types_ (must be the length of the sequence)
+                  indicating the type of each element, default is None indicating no restriction.
     :param member_validation_function: a callable validation function (see _is_validation_function for specifications)
                                        to be applied to all members or a sequence of validation functions with same
                                        length as the tuple to be applied to the member at the same position,
@@ -393,13 +375,13 @@ def sequence(input_: Any,
     assert (isinstance(sequence_type, NoneType) or check.is_sequence_type(sequence_type)
             or isinstance(sequence_type, list) and all([check.is_sequence_type(sequence_type_)
                                                         for sequence_type_ in sequence_type])), \
-        'sequence_type must be None, a sequence type or a list of sequence types'
+        'sequence_type must be None, a sequence type or a list of sequence types_'
     assert (isinstance(length, (int, NoneType))
             or isinstance(length, list) and all([isinstance(length_, int) for length_ in length])), \
         'length must be None, int or a list of int'
     assert (isinstance(type_, (NoneType, type))
             or isinstance(type_, tuple) and all([isinstance(member, type) for member in type_])), \
-        'type_ must be None, type or a tuple of types'
+        'type_ must be None, type or a tuple of types_'
     assert (isinstance(member_validation_function, NoneType) or _is_validation_function(member_validation_function)
             or isinstance(member_validation_function, tuple)
             and all([_is_validation_function(member_validation_function_)
@@ -474,7 +456,7 @@ def tuple_(input_: Any,
 
     :param input_: input to be validated.
     :param length: length of the tuple as int or list of acceptable length, default is None indicating no restriction.
-    :param type_: type of all member of the tuple or a tuple of types (must be the length of the tuple) indicating the
+    :param type_: type of all member of the tuple or a tuple of types_ (must be the length of the tuple) indicating the
                   type of each element, default is None indicating no restriction.
     :param member_validation_function: a callable validation function (see _is_validation_function for specifications)
                                        to be applied to all members or a sequence of validation functions with same
@@ -497,7 +479,7 @@ def list_(input_: Any,
 
     :param input_: input to be validated.
     :param length: length of the list as int or list of acceptable length, default is None indicating no restriction.
-    :param type_: type of all member of the list or a tuple of types (must be the length of the list) indicating the
+    :param type_: type of all member of the list or a tuple of types_ (must be the length of the list) indicating the
                   type of each element, default is None indicating no restriction.
     :param member_validation_function: a callable validation function (see _is_validation_function for specifications)
                                        to be applied to all members or a sequence of validation functions with same
@@ -523,7 +505,7 @@ def numpy_array(input_: Any,
                   default is None to indicate no restrictions.
     :param min_value: smallest allowed value in the array, default is None to indicate no lower limit.
     :param max_value: largest allowed value in the array, default is None to indicate no upper limit.
-    :param dtype: data type of array elements, only numeric types are allowed (promoting output to dtype),
+    :param dtype: data type of array elements, only numeric types_ are allowed (promoting output to dtype),
                   default is None keeping the default type assigned by numpy for the input (still numeric only!).
     :return: validated input, a numpy array of given shape and within given limits.
     :raises TypeError: if the input is not of proper shape, dtype is non-numeric or input cannot be cast to dtype.
@@ -537,7 +519,7 @@ def numpy_array(input_: Any,
     assert isinstance(max_value, NoneType) or check.is_numeric(max_value), 'max_value must be numeric or None'
     assert (isinstance(dtype, NoneType) or check.is_numpy_dtype(dtype)
             or isinstance(dtype, list) and all([check.is_numpy_dtype(dtype_) for dtype_ in dtype])), \
-        'dtype must be None, a numeric type or a list of numeric types'
+        'dtype must be None, a numeric type or a list of numeric types_'
 
     array_ = np.array(input_)  # to capture compatible inputs
     if (isinstance(shape, tuple)

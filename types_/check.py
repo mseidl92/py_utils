@@ -1,10 +1,10 @@
 """
-Methods:
+Functions:
 
 - is_numeric: checks for (non-complex) numbers (including numpy support).
 - is_integer: checks for integers (including numpy support).
 - is_sequence: checks for sequences.
-- is_sequence_type: checks for sequence types.
+- is_sequence_type: checks for sequence types_.
 - is_numpy_array: checks for numpy arrays with given properties.
 - is_numpy_array_shape: checks for numpy arrays shapes.
 - is_numpy_dtype: checks for numpy dtypes and compatibles.
@@ -17,15 +17,6 @@ __date__ = '2024-01-09'
 __version__ = '1.0'
 __license__ = 'GPL-3.0-or-later'
 
-__all__ = ['is_numeric',
-           'is_integer',
-           'is_sequence',
-           'is_sequence_type',
-           'is_numpy_array',
-           'is_numpy_array_shape',
-           'is_numpy_dtype',
-           'is_cv_image']
-
 # standard library imports
 from typing import Any
 from types import NoneType
@@ -34,7 +25,7 @@ import numpy as np
 # local library imports
 
 # project imports
-from .typevariables import TNum
+from .variables import TNum
 
 
 def is_numeric(input_: Any
@@ -99,7 +90,7 @@ def is_numpy_array(input_: Any,
                   default is None to indicate no restrictions.
     :param min_value: smallest allowed value in the array, default is None to indicate no lower limit.
     :param max_value: largest allowed value in the array, default is None to indicate no upper limit.
-    :param dtype: data type of array elements (only numeric types are allowed), default is None indicating no type check
+    :param dtype: data type of array elements (only numeric types_ are allowed), default is None indicating no type check
     :return: bool indicating if input is a numpy array of given conditions.
     """
     assert (isinstance(shape, NoneType) or is_numpy_array_shape(shape, allow_none=True)
@@ -109,7 +100,7 @@ def is_numpy_array(input_: Any,
     assert isinstance(max_value, NoneType) or is_numeric(max_value), 'max_value must be numeric or None'
     assert (isinstance(dtype, NoneType) or is_numpy_dtype(dtype)
             or isinstance(dtype, list) and all([is_numpy_dtype(dtype_) for dtype_ in dtype])), \
-        'dtype must be None, a numeric type or a list of numeric types'
+        'dtype must be None, a numeric type or a list of numeric types_'
 
     if not isinstance(input_, np.ndarray):
         return False

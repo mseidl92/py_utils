@@ -1,197 +1,116 @@
 """
-Methods:
+Classes:
 
-- Mathematical:
+- RGBColor: named RGB color values.
+- HorizontalTextAlignment: enum of horizontal text alignment formats.
+- VerticalTextAlignment: enum of vertical text alignment formats.
+- WindowAnchor: enum of typical anchors of a window.
 
-  - is_close: robust float equality.
-  - clip: limit input to interval
+Functions.
 
-- Geometry:
-
-  - wrap_to_pi: map angle to [-pi, pi) interval
-  - wrap_to_2pi: map angle to [0, 2*pi) interval
-  - rotation_matrix_2d: creates rotation matrix in 2 dimensions.
-  - polygon_outline_to_vertices: convert length and inner angles of polygon to vertex coordinates.
-  - polygon_centroid: get centroid from polygon vertices list.
-
-- File Handling:
-
-  - load_json: json file loading helper.
-
-- openCV helpers:
-
-  - value_to_image_dtype: converts input to fit a given images data type.
-  - print_text_on_image: prints text on openCV image.
+- value_to_image_dtype: converts input to fit a given images data type.
+- print_text_on_image: prints text on openCV image.
 
 """
 
 __author__ = 'Marius Seidl'
-__date__ = '2023-12-21'
+__date__ = '2024-02-05'
 __version__ = '1.0'
 __license__ = 'GPL-3.0-or-later'
 
-__all__ = ['is_close',
-           'clip',
-           'wrap_to_pi',
-           'wrap_to_2pi',
-           'rotation_matrix_2d',
-           'polygon_outline_to_vertices',
-           'polygon_centroid',
-           'load_json',
-           'value_to_image_dtype',
-           'print_text_on_image']
-
 # standard library imports
 import numpy as np
-import math
-import json
 import warnings
 
 # locally build library imports
 import cv2
 
 # project imports
-from .constants import FloatEquality, RGBColor, HorizontalTextAlignment, VerticalTextAlignment, WindowAnchor
-from .typevariables import TNum, T2DPoint
-from .warnings_ import VisualizationWarning
-from utils import typechecking as check
-
-"""Mathematical"""
+from ..types_ import check
+from ..exceptions.warnings_ import VisualizationWarning
+from .helper_classes import ContainsEnum
 
 
-def is_close(x: float,
-             y: float,
-             ) -> bool:
+class RGBColor:
     """
-    Determines if two floats are close based on tolerances.
-    Use for robust float equality comparison.
-
-    :param x: first float to compare.
-    :param y: second float to compare.
-    :return: bool indicating if x and y are close
+    Named RGB color values.
+    Basic RBG colors from `here <https://www.rapidtables.com/web/color/RGB_Color.html>`.
     """
-    return math.isclose(x, y, rel_tol=FloatEquality.REL_TOL, abs_tol=FloatEquality.ABS_TOL)
+    BLACK = (0, 0, 0)
+    WHITE = (255, 255, 255)
+    RED = (255, 0, 0)
+    LIME = (0, 255, 0)
+    BLUE = (0, 0, 255)
+    YELLOW = (255, 255, 0)
+    CYAN = (0, 255, 255)
+    MAGENTA = (255, 0, 255)
+    SILVER = (192, 192, 192)
+    GRAY = (128, 128, 128)
+    MAROON = (128, 0, 0)
+    OLIVE = (128, 128, 0)
+    GREEN = (0, 128, 0)
+    PURPLE = (128, 0, 128)
+    TEAL = (0, 128, 128)
+    NAVY = (0, 0, 128)
 
 
-def clip(x: TNum,
-         min_value: TNum,
-         max_value: TNum,
-         ) -> TNum:
+class HorizontalTextAlignment(ContainsEnum):
     """
-    Returns value, but moved to closer limiting value if outside min-max range.
-
-    :param x: value to be clipped.
-    :param min_value: lower clipping bound.
-    :param max_value: upper clipping bound.
-    :return: clipped numeric value
+    Standard horizontal text alignment modes.
     """
-    return max(min_value, min(max_value, x))
+    LEFT = 0
+    CENTERED = 1
+    RIGHT = 2
+    JUSTIFIED = 3
 
 
-"""Geometry"""
-
-
-def wrap_to_pi(angle: TNum
-               ) -> TNum:
+class VerticalTextAlignment(ContainsEnum):
     """
-    Maps an angle in radians onto the interval [-pi, pi).
-
-    :param angle: the angle to be wrapped to by.
-    :return: wrapped angle in radians.
+    Standard vertical text alignment modes.
     """
-    return (angle + np.pi) % (2 * np.pi) - np.pi
+    TOP = 0
+    CENTERED = 1
+    BOTTOM = 2
+    SPREAD = 3
 
 
-def wrap_to_2pi(angle: TNum
-                ) -> TNum:
+class WindowAnchor(ContainsEnum):
     """
-    Maps an angle in radians onto the interval [0, 2*pi).
+    Standard anchor points for a rectangular window.
 
-    :param angle: the angle to be wrapped to by.
-    :return: wrapped angle in radians.
+    x--------x--------x
+    |                 |
+    x        x        x
+    |                 |
+    x--------x--------x
+
     """
-    return angle % (2 * np.pi)
+    TOP_LEFT = 0
+    LEFT_TOP = 0
 
+    CENTER_LEFT = 1
+    LEFT_CENTER = 1
 
-def rotation_matrix_2d(angle: float
-                       ) -> np.ndarray:
-    """
-    Creates a 2D rotation matrix from an angle.
+    BOTTOM_LEFT = 2
+    LEFT_BOTTOM = 2
 
-    :param angle: the angle in radians.
-    :return: numpy array 2x2 rotation matrix-
-    """
-    s, c = np.sin(angle), np.cos(angle)
-    return np.array([[c, -s], [s, c]])
+    TOP_CENTER = 3
+    CENTER_TOP = 3
 
+    CENTER = 4
+    CENTER_CENTER = 4
 
-def polygon_outline_to_vertices(length: list[TNum, ...],
-                                angles: list[TNum, ...],
-                                degrees: bool = False
-                                ) -> np.ndarray:
-    """
-    Converts a list of side length and angles
-    to a list of (x,y) vertices of a polygon.
+    BOTTOM_CENTER = 5
+    CENTER_BOTTOM = 5
 
-    :param length: list of side length of the polygon in clockwise order, starting at (0, 0).
-    :param angles: list of inside angles of the polygon in clockwise order, starting with first at (0, 0).
-    :param degrees: boolean flag indicating if angles are in degree. Default is radians (=False).
-    :return: list of vertices in scale indicated by length.
-    """
+    TOP_RIGHT = 6
+    RIGHT_TOP = 6
 
-    # convert to numpy and radians
-    length = np.array(length)
-    angles = np.array(angles)
-    if degrees:
-        angles = np.deg2rad(angles)
+    CENTER_RIGHT = 7
+    RIGHT_CENTER = 7
 
-    # check if angles sum error needs correction and apply deviation equally
-    angles += (np.pi * (angles.shape[0] - 2) - np.sum(angles)) / angles.shape[0]
-
-    # convert to vertices
-    vertices = np.cumsum(np.array([np.cos(np.cumsum(angles - np.pi) + np.pi),
-                                   np.sin(np.cumsum(angles - np.pi) + np.pi)]).T * length[:, np.newaxis], axis=0)
-
-    # use missmatch between [0, 0] and calculated last vertex to estimate x- and y-stretch factor
-    vertices *= 1 - (vertices[-1, :] / (np.max(vertices, axis=0) - np.min(vertices, axis=0)))
-    vertices[-1, :] = [0, 0]
-
-    return vertices
-
-
-def polygon_centroid(vertices: list[T2DPoint, ...] | np.ndarray
-                     ) -> T2DPoint:
-    """
-    Calculates coordinates of the centroid of a polygon
-
-    :param vertices: vertices of the polygon, either as a list of points or an (N,2) numpy array.
-    :return: coordinates of the centroid.
-    """
-    vertices = np.array(vertices)
-    vertices_shoelace = vertices[:-1, 0] * vertices[1:, 1] - vertices[1:, 0] * vertices[:-1, 1]
-    shoelace_factor = 1 / (3 * np.sum(vertices_shoelace))
-    centroid_x = shoelace_factor * np.sum((vertices[:-1, 0] + vertices[1:, 0]) * vertices_shoelace)
-    centroid_y = shoelace_factor * np.sum((vertices[:-1, 1] + vertices[1:, 1]) * vertices_shoelace)
-    return centroid_x, centroid_y
-
-
-"""File Handling"""
-
-
-def load_json(file_path: str
-              ) -> dict:
-    """
-    Loads json file.
-
-    :param file_path: path to the json file.
-    :return: dict containing json file content
-    """
-    # TODO make type save and handle exceptions
-    with open(file_path) as fp:
-        return json.load(fp)
-
-
-""" openCV helpers"""
+    BOTTOM_RIGHT = 8
+    RIGHT_BOTTOM = 8
 
 
 def value_to_image_dtype(value: int | float | np.ndarray,
@@ -355,7 +274,7 @@ def print_text_on_image(text: tuple[str] | str,
     assert isinstance(rotation_anchor, (int, WindowAnchor)) and rotation_anchor in WindowAnchor, \
         'Expected rotation_anchor to be a int representing a valid WindowAnchor enum value.'
 
-    # define some variable types
+    # define some variable types_
     font_scale: float
     border_width: int
     line_distance: int

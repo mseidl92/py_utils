@@ -17,6 +17,15 @@ __date__ = '2024-01-09'
 __version__ = '1.0'
 __license__ = 'GPL-3.0-or-later'
 
+__all__ = ['is_numeric',
+           'is_integer',
+           'is_sequence',
+           'is_sequence_type',
+           'is_numpy_array',
+           'is_numpy_array_shape',
+           'is_numpy_dtype',
+           'is_cv_image']
+
 # standard library imports
 from typing import Any
 from types import NoneType

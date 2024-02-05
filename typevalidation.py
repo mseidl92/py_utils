@@ -25,6 +25,23 @@ __date__ = '2023-12-21'
 __version__ = '1.0'
 __license__ = 'GPL-3.0-or-later'
 
+__all__ = ['bind',
+           'or_',
+           'and_',
+           'not_',
+           'number',
+           'integer',
+           'less',
+           'less_equal',
+           'equal',
+           'not_equal',
+           'greater',
+           'greater_equal',
+           'sequence',
+           'tuple_',
+           'list_',
+           'numpy_array']
+
 # standard library imports
 import numpy as np
 from typing import Any, TypeVar, Callable, Protocol
@@ -33,8 +50,9 @@ import inspect
 from functools import partial
 
 # project imports
-from .typevariables import TNum, TSequence, TArgs, TKwargs
 from . import typechecking as check
+from .typevariables import TNum, TSequence, TArgs, TKwargs
+
 
 
 # TODO that works in mypy but not with the pycharm typechecker, wait for update to use it instead of Callable[..., U]
